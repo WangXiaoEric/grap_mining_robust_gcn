@@ -11,3 +11,4 @@ it is impossible to put Gamma, lambda_ and phi into the model to calculate the g
 Model in Main,  a\*gamma^2 + b\*lambda_^2 + c\*phi^2, gamma, lambda_, phi, step by step, and train many times (say 1000 times), leaving ACC.
 The parameters A, B and C in the model were fitted and solved, and the parameters corresponding to the maximum value of ACC in the curve were found as the actual parameters used by Pro-GCN.
 
+$x_i^2$
