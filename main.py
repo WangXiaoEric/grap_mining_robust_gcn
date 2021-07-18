@@ -11,6 +11,8 @@ from prognn import ProGNN
 from dataset import Dataset
 from attacked_data import PrePtbDataset
 from deeprobust.graph.utils import preprocess
+import numpy as np
+from scipy.optimize import curve_fit
 
 # Training settings
 parser = argparse.ArgumentParser()
@@ -35,7 +37,7 @@ parser.add_argument('--attack', type=str, default='meta',
         choices=['no', 'meta', 'random', 'nettack'])
 parser.add_argument('--ptb_rate', type=float, default=0.05, help="noise ptb_rate")
 # parser.add_argument('--epochs', type=int,  default=400, help='Number of epochs to train.')
-parser.add_argument('--epochs', type=int,  default=100, help='Number of epochs to train.')
+parser.add_argument('--epochs', type=int,  default=1, help='Number of epochs to train.')
 parser.add_argument('--alpha', type=float, default=5e-4, help='weight of l1 norm')
 parser.add_argument('--beta', type=float, default=1.5, help='weight of nuclear norm')
 parser.add_argument('--gamma', type=float, default=1, help='weight of l2 norm')
@@ -82,18 +84,34 @@ if args.attack == 'meta' or args.attack == 'nettack':
             ptb_rate=args.ptb_rate)
     perturbed_adj = perturbed_data.adj
 
+def func(X, a, b, c):
+    gamma,lambda_,phi = X
+    return a*gamma**2 + b*lambda_**2 + c*phi**2
+# some artificially noisy data to fit
+gamma = np.linspace(0,500,1000)
+lambda_ = np.linspace(0,500,1000)
+phi = np.linspace(0,500,1000)
+z = []
+for index in range(1001):        # 第二个实例
+    args.gamma = gamma[index]
+    args.lambda_ = lambda_[index]
+    args.phi = phi[index]
 
-np.random.seed(args.seed)
-torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
 
-model = GCN(nfeat=features.shape[1],
-            nhid=args.hidden,
-            nclass=labels.max().item() + 1,
-            dropout=args.dropout, device=device)
+    model = GCN(nfeat=features.shape[1],
+                nhid=args.hidden,
+                nclass=labels.max().item() + 1,
+                dropout=args.dropout, device=device)
 
-perturbed_adj, features, labels = preprocess(perturbed_adj, features, labels, preprocess_adj=False, device=device)
+    perturbed_adj, features, labels = preprocess(perturbed_adj, features, labels, preprocess_adj=False, device=device)
 
-prognn = ProGNN(model, args, device)
-prognn.fit(features, perturbed_adj, labels, idx_train, idx_val)
-prognn.test(features, labels, idx_test)
+    prognn = ProGNN(model, args, device)
+    prognn.fit(features, perturbed_adj, labels, idx_train, idx_val)
+    acc = prognn.test(features, labels, idx_test)
+    z.append(acc)
+p0 = 1., 1., 1.
+res = curve_fit(func, (gamma,lambda_,phi), z, p0)
+print(res)
 
